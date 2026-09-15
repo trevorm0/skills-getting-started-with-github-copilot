@@ -12,6 +12,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Clear loading message
       activitiesList.innerHTML = "";
+      activitySelect.length = 1;
 
       // Populate activities list
       Object.entries(activities).forEach(([name, details]) => {
@@ -25,8 +26,62 @@ document.addEventListener("DOMContentLoaded", () => {
           <p>${details.description}</p>
           <p><strong>Schedule:</strong> ${details.schedule}</p>
           <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
+          <div class="participants-section">
+            <strong>Participants:</strong>
+            <ul class="participants-list">
+              ${details.participants
+                .map(
+                  (participant) => `
+                    <li>
+                      <span>${participant}</span>
+                      <button
+                        type="button"
+                        class="delete-participant"
+                        data-activity="${encodeURIComponent(name)}"
+                        data-email="${encodeURIComponent(participant)}"
+                        aria-label="Remove ${participant} from ${name}"
+                        title="Remove participant"
+                      >
+                        &times;
+                      </button>
+                    </li>`
+                )
+                .join("")}
+            </ul>
+          </div>
         `;
 
+
+  activitiesList.addEventListener("click", async (event) => {
+    const deleteButton = event.target.closest(".delete-participant");
+    if (!deleteButton) {
+      return;
+    }
+
+    const activity = decodeURIComponent(deleteButton.dataset.activity);
+    const email = decodeURIComponent(deleteButton.dataset.email);
+
+    try {
+      const response = await fetch(
+        `/activities/${encodeURIComponent(activity)}/signup?email=${encodeURIComponent(email)}`,
+        { method: "DELETE" }
+      );
+      const result = await response.json();
+
+      messageDiv.textContent = result.message || result.detail || "An error occurred";
+      messageDiv.className = response.ok ? "success" : "error";
+      messageDiv.classList.remove("hidden");
+
+      if (response.ok) {
+        await fetchActivities();
+      }
+    } catch (error) {
+      messageDiv.textContent = "Failed to unregister participant. Please try again.";
+      messageDiv.className = "error";
+      messageDiv.classList.remove("hidden");
+      console.error("Error unregistering participant:", error);
+    }
+  });
         activitiesList.appendChild(activityCard);
 
         // Add option to select dropdown
@@ -62,6 +117,7 @@ document.addEventListener("DOMContentLoaded", () => {
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
         signupForm.reset();
+        await fetchActivities();
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
